@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 cert.pem
 key.pem
+instance/
+*.sqlite3

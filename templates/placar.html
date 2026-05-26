@@ -2,69 +2,101 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>BeachScore AI</title>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+        }
+
         body {
             margin: 0;
             background: #080808;
             color: white;
             font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .screen {
+            min-height: 100vh;
+            display: grid;
+            grid-template-rows: auto 1fr auto auto;
         }
 
         .top {
-            padding: 24px 40px;
+            padding: 24px 42px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             background: #111;
             border-bottom: 4px solid #00ff88;
+            gap: 24px;
         }
 
         .brand {
-            font-size: 42px;
-            font-weight: bold;
-        }
-
-        .court {
-            font-size: 32px;
-            color: #00ff88;
+            font-size: 44px;
+            font-weight: 800;
         }
 
         .match {
-            font-size: 26px;
+            font-size: 28px;
             color: #ddd;
+            margin-top: 6px;
+        }
+
+        .arena {
+            font-size: 44px;
+            color: #00ff88;
+            font-weight: 800;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .versus {
+            padding: 22px 42px 0;
+            text-align: center;
+            color: #d7dde5;
+            font-size: 36px;
+            font-weight: 700;
         }
 
         .scoreboard {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 40px;
-            padding: 50px;
+            padding: 28px 50px 34px;
+            min-height: 0;
         }
 
         .team {
             border-radius: 30px;
             background: #151515;
-            padding: 40px;
+            padding: 38px;
             text-align: center;
             border: 3px solid #333;
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            min-width: 0;
         }
 
         .team.server {
             border-color: #00ff88;
-            box-shadow: 0 0 35px rgba(0,255,136,.35);
+            box-shadow: 0 0 35px rgba(0, 255, 136, .35);
         }
 
         .team-name {
-            font-size: 54px;
-            font-weight: bold;
-            margin-bottom: 30px;
+            font-size: 56px;
+            font-weight: 800;
+            margin-bottom: 28px;
+            overflow-wrap: anywhere;
         }
 
         .points {
+            align-self: center;
             font-size: 170px;
-            font-weight: bold;
+            font-weight: 900;
             color: #00ff88;
             line-height: 1;
         }
@@ -90,40 +122,42 @@
 
         .value {
             font-size: 54px;
-            font-weight: bold;
+            font-weight: 800;
         }
 
         .status {
-            margin: 0 50px;
-            padding: 25px;
+            margin: 0 50px 24px;
+            padding: 24px 28px;
             border-radius: 22px;
             background: #151515;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 34px;
+            gap: 24px;
+            font-size: 32px;
         }
 
         .warning {
             color: #ffcc00;
-            font-weight: bold;
+            font-weight: 800;
         }
 
         .finished {
             color: #ff4444;
-            font-weight: bold;
+            font-weight: 800;
         }
 
         .events {
-            margin: 30px 50px;
+            margin: 0 50px 28px;
             background: #111;
             border-radius: 20px;
-            padding: 20px 30px;
+            padding: 18px 28px;
             font-size: 24px;
+            min-height: 72px;
         }
 
         .event {
-            padding: 8px 0;
+            padding: 6px 0;
             border-bottom: 1px solid #333;
             color: #ddd;
         }
@@ -131,67 +165,89 @@
         .event:last-child {
             border-bottom: 0;
         }
+
+        @media (max-width: 900px) {
+            body { overflow: auto; }
+            .top, .status { flex-direction: column; align-items: flex-start; }
+            .arena { text-align: left; }
+            .scoreboard { grid-template-columns: 1fr; padding: 24px; gap: 24px; }
+            .team { border-radius: 20px; padding: 26px; }
+            .team-name { font-size: 34px; }
+            .points { font-size: 96px; }
+            .details { gap: 16px; }
+            .versus { font-size: 24px; padding: 18px 24px 0; }
+            .status, .events { margin: 0 24px 24px; font-size: 22px; }
+        }
     </style>
 </head>
 <body>
 
-<div class="top">
+<div class="screen">
+    <div class="top">
+        <div>
+            <div class="brand">BEACH SCORE AI</div>
+            <div class="match" id="matchName">Partida Principal</div>
+        </div>
+        <div class="arena" id="arena">Arena 01</div>
+    </div>
+
     <div>
-        <div class="brand">BEACH SCORE AI</div>
-        <div class="match" id="matchName">Partida</div>
-    </div>
-    <div class="court" id="court">Quadra</div>
-</div>
+        <div class="versus" id="versus">Dupla Azul x Dupla Vermelha</div>
 
-<div class="scoreboard">
-    <div class="team" id="cardA">
-        <div class="team-name" id="teamA">Dupla Azul</div>
-        <div class="points" id="pointsA">0</div>
-        <div class="details">
-            <div class="box">
-                <div class="label">GAMES</div>
-                <div class="value" id="gamesA">0</div>
+        <div class="scoreboard">
+            <div class="team" id="cardA">
+                <div class="team-name" id="teamA">Dupla Azul</div>
+                <div class="points" id="pointsA">0</div>
+                <div class="details">
+                    <div class="box">
+                        <div class="label">GAMES</div>
+                        <div class="value" id="gamesA">0</div>
+                    </div>
+                    <div class="box">
+                        <div class="label">SETS</div>
+                        <div class="value" id="setsA">0</div>
+                    </div>
+                </div>
             </div>
-            <div class="box">
-                <div class="label">SETS</div>
-                <div class="value" id="setsA">0</div>
-            </div>
-        </div>
-    </div>
 
-    <div class="team" id="cardB">
-        <div class="team-name" id="teamB">Dupla Vermelha</div>
-        <div class="points" id="pointsB">0</div>
-        <div class="details">
-            <div class="box">
-                <div class="label">GAMES</div>
-                <div class="value" id="gamesB">0</div>
-            </div>
-            <div class="box">
-                <div class="label">SETS</div>
-                <div class="value" id="setsB">0</div>
+            <div class="team" id="cardB">
+                <div class="team-name" id="teamB">Dupla Vermelha</div>
+                <div class="points" id="pointsB">0</div>
+                <div class="details">
+                    <div class="box">
+                        <div class="label">GAMES</div>
+                        <div class="value" id="gamesB">0</div>
+                    </div>
+                    <div class="box">
+                        <div class="label">SETS</div>
+                        <div class="value" id="setsB">0</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="status">
-    <div id="serverInfo">Saque: -</div>
-    <div id="sideChangeInfo"></div>
-    <div id="finishedInfo"></div>
-</div>
+    <div class="status">
+        <div id="serverInfo">Saque: -</div>
+        <div id="sideChangeInfo"></div>
+        <div id="finishedInfo"></div>
+    </div>
 
-<div class="events" id="events"></div>
+    <div class="events" id="events"></div>
+</div>
 
 <script>
-    const socket = io();
+    const params = new URLSearchParams(window.location.search);
+    const courtId = params.get("court_id") || params.get("arena_id") || "arena-1";
+    const socket = io({query: {court_id: courtId}});
 
     function render(data) {
-        document.getElementById("court").innerText = data.court;
+        document.getElementById("arena").innerText = data.court;
         document.getElementById("matchName").innerText = data.match_name;
 
         document.getElementById("teamA").innerText = data.team_a;
         document.getElementById("teamB").innerText = data.team_b;
+        document.getElementById("versus").innerText = data.team_a + " x " + data.team_b;
 
         document.getElementById("pointsA").innerText = data.score.A.label;
         document.getElementById("pointsB").innerText = data.score.B.label;
@@ -217,7 +273,7 @@
         const events = document.getElementById("events");
         events.innerHTML = "";
 
-        data.events.forEach(e => {
+        data.events.slice(0, 3).forEach(e => {
             const div = document.createElement("div");
             div.className = "event";
             div.innerText = e.time + " - " + e.text;
@@ -227,7 +283,7 @@
 
     socket.on("state", render);
 
-    fetch("/api/state")
+    fetch("/api/courts/" + encodeURIComponent(courtId) + "/state")
         .then(r => r.json())
         .then(render);
 </script>

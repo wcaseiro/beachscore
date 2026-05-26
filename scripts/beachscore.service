@@ -1,0 +1,15 @@
+[Unit]
+Description=BeachScore AI
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/beachscore
+ExecStart=/opt/beachscore/.venv/bin/python /opt/beachscore/app.py
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin - BeachScore AI</title>
+    <style>
+        body {
+            margin: 0;
+            background: #0d1117;
+            color: #f0f6fc;
+            font-family: Arial, sans-serif;
+        }
+
+        header {
+            padding: 22px 28px;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        main {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            min-height: calc(100vh - 72px);
+        }
+
+        aside {
+            border-right: 1px solid #30363d;
+            padding: 18px;
+            background: #0b0f14;
+        }
+
+        section {
+            padding: 22px;
+        }
+
+        button, input {
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 11px 12px;
+            background: #161b22;
+            color: #f0f6fc;
+            font-size: 15px;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .court {
+            width: 100%;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+
+        .court.active {
+            border-color: #00cc77;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .metric, .timeline, .replay {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .metric strong {
+            display: block;
+            font-size: 28px;
+            color: #00cc77;
+        }
+
+        .timeline button {
+            width: 100%;
+            margin: 6px 0;
+            text-align: left;
+        }
+
+        pre {
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 860px) {
+            main, .grid { grid-template-columns: 1fr; }
+            aside { border-right: 0; border-bottom: 1px solid #30363d; }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <h1>BeachScore Admin</h1>
+    <button onclick="createCourt()">Nova arena</button>
+</header>
+
+<main>
+    <aside>
+        <h2>Arenas</h2>
+        <div id="courts"></div>
+    </aside>
+
+    <section>
+        <div class="grid">
+            <div class="metric">Arena<strong id="metricCourt">-</strong></div>
+            <div class="metric">Partida<strong id="metricMatch">-</strong></div>
+            <div class="metric">Placar<strong id="metricScore">-</strong></div>
+            <div class="metric">Status<strong id="metricStatus">-</strong></div>
+        </div>
+
+        <div class="grid">
+            <a id="scoreboardLink" href="/"><button>Placar publico</button></a>
+            <a id="controlLink" href="/control"><button>Controle</button></a>
+            <button onclick="refresh()">Atualizar</button>
+            <button onclick="newMatch()">Nova partida</button>
+        </div>
+
+        <div class="timeline">
+            <h2>Timeline</h2>
+            <div id="timeline"></div>
+        </div>
+
+        <div class="replay">
+            <h2>Replay</h2>
+            <pre id="replay">Selecione um evento da timeline.</pre>
+        </div>
+    </section>
+</main>
+
+<script>
+    let selectedCourt = "arena-1";
+
+    function api(path) {
+        return "/api" + path;
+    }
+
+    function selectCourt(courtId) {
+        selectedCourt = courtId;
+        refresh();
+    }
+
+    function refresh() {
+        loadCourts();
+        loadState();
+        loadTimeline();
+    }
+
+    function loadCourts() {
+        fetch(api("/courts"))
+            .then(r => r.json())
+            .then(data => {
+                const box = document.getElementById("courts");
+                box.innerHTML = "";
+                data.courts.forEach(court => {
+                    const button = document.createElement("button");
+                    button.className = "court" + (court.id === selectedCourt ? " active" : "");
+                    button.innerText = court.name + " (" + court.id + ")";
+                    button.onclick = () => selectCourt(court.id);
+                    box.appendChild(button);
+                });
+            });
+    }
+
+    function loadState() {
+        fetch(api("/courts/" + encodeURIComponent(selectedCourt) + "/state"))
+            .then(r => r.json())
+            .then(state => {
+                document.getElementById("metricCourt").innerText = state.court;
+                document.getElementById("metricMatch").innerText = state.match_name;
+                document.getElementById("metricScore").innerText =
+                    state.score.A.games + " x " + state.score.B.games;
+                document.getElementById("metricStatus").innerText =
+                    state.finished ? "Encerrada" : "Ao vivo";
+                document.getElementById("scoreboardLink").href =
+                    "/?court_id=" + encodeURIComponent(selectedCourt);
+                document.getElementById("controlLink").href =
+                    "/control?court_id=" + encodeURIComponent(selectedCourt);
+            });
+    }
+
+    function loadTimeline() {
+        fetch(api("/courts/" + encodeURIComponent(selectedCourt) + "/timeline"))
+            .then(r => r.json())
+            .then(data => {
+                const box = document.getElementById("timeline");
+                box.innerHTML = "";
+                data.events.forEach(event => {
+                    const button = document.createElement("button");
+                    button.innerText = "#" + event.id + " " + event.action + " - " + event.text;
+                    button.onclick = () => replay(event.id);
+                    box.appendChild(button);
+                });
+            });
+    }
+
+    function replay(eventId) {
+        fetch(api("/replay/" + eventId))
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById("replay").innerText = JSON.stringify(data, null, 2);
+            });
+    }
+
+    function createCourt() {
+        const name = prompt("Nome da arena");
+        if (!name) return;
+        fetch(api("/courts"), {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({name})
+        })
+        .then(r => r.json())
+        .then(state => {
+            selectedCourt = state.court_id;
+            refresh();
+        });
+    }
+
+    function newMatch() {
+        fetch(api("/courts/" + encodeURIComponent(selectedCourt) + "/new"), {method: "POST"})
+            .then(refresh);
+    }
+
+    refresh();
+</script>
+</body>
+</html>

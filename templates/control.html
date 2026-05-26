@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Controle - BeachScore AI</title>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <style>
@@ -20,28 +21,36 @@
 
         .card {
             background: #1a1a1a;
-            border-radius: 18px;
+            border-radius: 8px;
             padding: 18px;
             margin-bottom: 18px;
         }
 
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
         input, select {
+            box-sizing: border-box;
             width: 100%;
-            font-size: 22px;
+            font-size: 20px;
             padding: 14px;
             margin: 8px 0;
-            border-radius: 12px;
+            border-radius: 8px;
             border: 0;
         }
 
         button {
             width: 100%;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
-            padding: 22px;
+            padding: 18px;
             margin: 10px 0;
-            border-radius: 16px;
+            border-radius: 8px;
             border: 0;
+            cursor: pointer;
         }
 
         .blue { background: #008cff; color: white; }
@@ -51,9 +60,10 @@
         .yellow { background: #ffcc00; color: #111; }
 
         .score {
-            font-size: 34px;
+            font-size: 30px;
             text-align: center;
             margin: 20px 0;
+            white-space: pre-line;
         }
 
         .voiceResult {
@@ -62,6 +72,15 @@
             text-align: center;
             min-height: 32px;
         }
+
+        a {
+            color: #00ff88;
+        }
+
+        @media (max-width: 720px) {
+            .row { grid-template-columns: 1fr; }
+            button { font-size: 20px; }
+        }
     </style>
 </head>
 <body>
@@ -69,17 +88,22 @@
 <h1>BeachScore AI</h1>
 
 <div class="card">
-    <input id="court" placeholder="Quadra" value="Quadra 1">
-    <input id="match_name" placeholder="Nome da partida" value="Partida Demo">
-    <input id="team_a" placeholder="Dupla A" value="Dupla Azul">
-    <input id="team_b" placeholder="Dupla B" value="Dupla Vermelha">
+    <div class="row">
+        <input id="court_id" placeholder="ID da arena" value="arena-1">
+        <input id="court" placeholder="Arena" value="Arena 01">
+    </div>
+    <input id="match_name" placeholder="Nome da partida" value="Partida Principal">
+    <div class="row">
+        <input id="team_a" placeholder="Dupla A" value="Dupla Azul">
+        <input id="team_b" placeholder="Dupla B" value="Dupla Vermelha">
+    </div>
 
     <select id="server">
         <option value="A">Saque inicial: Dupla A</option>
         <option value="B">Saque inicial: Dupla B</option>
     </select>
 
-    <button class="green" onclick="saveConfig()">SALVAR CONFIGURAÇÃO</button>
+    <button class="green" onclick="saveConfig()">SALVAR CONFIGURACAO</button>
 </div>
 
 <div class="card">
@@ -92,16 +116,34 @@
 </div>
 
 <div class="card">
-    <button class="green" onclick="startVoice()">🎤 FALAR COMANDO</button>
+    <button class="green" onclick="startVoice()">FALAR COMANDO</button>
     <div class="voiceResult" id="voiceResult"></div>
 </div>
 
+<p><a href="/admin">Abrir dashboard admin</a></p>
+
 <script>
-    const socket = io();
+    const params = new URLSearchParams(window.location.search);
+    let courtId = params.get("court_id") || params.get("arena_id") || "arena-1";
+    document.getElementById("court_id").value = courtId;
+
+    const socket = io({query: {court_id: courtId}});
     let lastState = null;
+
+    function endpoint(path) {
+        return "/api/courts/" + encodeURIComponent(courtId) + path;
+    }
 
     function updateControl(data) {
         lastState = data;
+        courtId = data.court_id || courtId;
+
+        document.getElementById("court_id").value = courtId;
+        document.getElementById("court").value = data.court;
+        document.getElementById("match_name").value = data.match_name;
+        document.getElementById("team_a").value = data.team_a;
+        document.getElementById("team_b").value = data.team_b;
+        document.getElementById("server").value = data.server;
 
         document.getElementById("scoreText").innerText =
             data.team_a + " " +
@@ -113,34 +155,36 @@
 
     socket.on("state", updateControl);
 
-    fetch("/api/state")
+    fetch(endpoint("/state"))
         .then(r => r.json())
         .then(updateControl);
 
     function point(team) {
-        fetch("/api/point/" + team, { method: "POST" });
+        fetch(endpoint("/point/" + team), { method: "POST" });
     }
 
     function undo() {
-        fetch("/api/undo", { method: "POST" });
+        fetch(endpoint("/undo"), { method: "POST" });
     }
 
     function newMatch() {
         if (confirm("Iniciar nova partida?")) {
-            fetch("/api/new", { method: "POST" });
+            fetch(endpoint("/new"), { method: "POST" });
         }
     }
 
     function saveConfig() {
+        courtId = document.getElementById("court_id").value || "arena-1";
         const payload = {
             court: document.getElementById("court").value,
             match_name: document.getElementById("match_name").value,
             team_a: document.getElementById("team_a").value,
             team_b: document.getElementById("team_b").value,
-            server: document.getElementById("server").value
+            server: document.getElementById("server").value,
+            arena: document.getElementById("court").value
         };
 
-        fetch("/api/config", {
+        fetch(endpoint("/config"), {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(payload)
@@ -150,7 +194,7 @@
     function sendCommand(command) {
         document.getElementById("voiceResult").innerText = "Comando: " + command;
 
-        fetch("/api/command", {
+        fetch(endpoint("/command"), {
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({command})
@@ -165,7 +209,7 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
-            alert("Seu navegador não suporta reconhecimento de voz. Use Chrome no Android.");
+            alert("Seu navegador nao suporta reconhecimento de voz. Use Chrome no Android.");
             return;
         }
 
@@ -175,8 +219,7 @@
         recognition.maxAlternatives = 1;
 
         recognition.onresult = function(event) {
-            const command = event.results[0][0].transcript;
-            sendCommand(command);
+            sendCommand(event.results[0][0].transcript);
         };
 
         recognition.onerror = function(event) {
