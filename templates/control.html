@@ -73,6 +73,10 @@
             min-height: 32px;
         }
 
+        .voiceResult.error {
+            color: #ff6666;
+        }
+
         a {
             color: #00ff88;
         }
@@ -109,8 +113,8 @@
 <div class="card">
     <div class="score" id="scoreText">0 x 0</div>
 
-    <button class="blue" onclick="point('A')">PONTO DUPLA A</button>
-    <button class="red" onclick="point('B')">PONTO DUPLA B</button>
+    <button class="blue" id="pointAButton" onclick="point('A')">PONTO DUPLA A</button>
+    <button class="red" id="pointBButton" onclick="point('B')">PONTO DUPLA B</button>
     <button class="yellow" onclick="undo()">DESFAZER</button>
     <button class="gray" onclick="newMatch()">NOVA PARTIDA</button>
 </div>
@@ -144,6 +148,8 @@
         document.getElementById("team_a").value = data.team_a;
         document.getElementById("team_b").value = data.team_b;
         document.getElementById("server").value = data.server;
+        document.getElementById("pointAButton").innerText = "PONTO " + data.team_a.toUpperCase();
+        document.getElementById("pointBButton").innerText = "PONTO " + data.team_b.toUpperCase();
 
         document.getElementById("scoreText").innerText =
             data.team_a + " " +
@@ -188,11 +194,13 @@
             method: "POST",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify(payload)
-        });
+        })
+        .then(r => r.json())
+        .then(updateControl);
     }
 
     function sendCommand(command) {
-        document.getElementById("voiceResult").innerText = "Comando: " + command;
+        showVoiceResult("Comando: " + command, false);
 
         fetch(endpoint("/command"), {
             method: "POST",
@@ -201,7 +209,9 @@
         })
         .then(r => r.json())
         .then(data => {
-            document.getElementById("voiceResult").innerText = data.result;
+            showVoiceResult(data.result, !data.recognized);
+            playTone(data.recognized ? "success" : "error");
+            updateControl(data.state);
         });
     }
 
@@ -209,6 +219,7 @@
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
         if (!SpeechRecognition) {
+            playTone("error");
             alert("Seu navegador nao suporta reconhecimento de voz. Use Chrome no Android.");
             return;
         }
@@ -223,10 +234,35 @@
         };
 
         recognition.onerror = function(event) {
-            document.getElementById("voiceResult").innerText = "Erro no reconhecimento: " + event.error;
+            showVoiceResult("Erro no reconhecimento: " + event.error, true);
+            playTone("error");
         };
 
         recognition.start();
+    }
+
+    function showVoiceResult(text, isError) {
+        const element = document.getElementById("voiceResult");
+        element.innerText = text;
+        element.classList.toggle("error", isError);
+    }
+
+    function playTone(type) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+
+        const audio = new AudioContext();
+        const oscillator = audio.createOscillator();
+        const gain = audio.createGain();
+
+        oscillator.type = type === "error" ? "square" : "sine";
+        oscillator.frequency.value = type === "error" ? 180 : 880;
+        gain.gain.value = 0.08;
+
+        oscillator.connect(gain);
+        gain.connect(audio.destination);
+        oscillator.start();
+        oscillator.stop(audio.currentTime + (type === "error" ? 0.35 : 0.12));
     }
 </script>
 

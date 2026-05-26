@@ -56,9 +56,9 @@ def legacy_new():
 def legacy_command():
     data = request.get_json() or {}
     cid = data.get("court_id", "arena-1")
-    result, state = voice().handle(cid, data.get("command", ""))
+    result, state, recognized = voice().handle(cid, data.get("command", ""))
     ws().emit_state(cid, state)
-    return jsonify({"ok": True, "result": result, "state": state})
+    return jsonify({"ok": True, "recognized": recognized, "result": result, "state": state})
 
 
 @api_bp.post("/config")
@@ -122,9 +122,9 @@ def court_config(cid):
 @api_bp.post("/courts/<cid>/command")
 def court_command(cid):
     data = request.get_json() or {}
-    result, state = voice().handle(cid, data.get("command", ""))
+    result, state, recognized = voice().handle(cid, data.get("command", ""))
     ws().emit_state(cid, state)
-    return jsonify({"ok": True, "result": result, "state": state})
+    return jsonify({"ok": True, "recognized": recognized, "result": result, "state": state})
 
 
 @api_bp.get("/courts/<cid>/timeline")
